@@ -6,35 +6,53 @@
 #define WIFI_TIMEOUT_MS 20000
 #endif
 
+#ifndef WIFI_RETRY_DELAY_MS
+#define WIFI_RETRY_DELAY_MS 5000
+#endif
+
+#ifndef LED_ACTIVE_LOW
+#define LED_ACTIVE_LOW 0
+#endif
+
+static void setLed(bool on) {
+  digitalWrite(LED_BUILTIN, (LED_ACTIVE_LOW ? !on : on) ? HIGH : LOW);
+}
+
 void KeepWiFiAlive(void* paramaters){
   for(;;){
     if(WiFi.status() == WL_CONNECTED){
-        Serial.println("WiFi still connected");
-        digitalWrite(LED_BUILTIN, HIGH);
+        setLed(true);
+        Serial.println("[WiFi] still connected");
         vTaskDelay(10000 / portTICK_PERIOD_MS);
         continue;
     }
 
-    Serial.println("WiFi connecting");
+    Serial.println("[WiFi] connecting...");
     WiFi.mode(WIFI_STA);
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
     unsigned long startAttemptTime = millis();
+    bool blinkState = false;
 
     while(WiFi.status() != WL_CONNECTED && millis()-startAttemptTime < WIFI_TIMEOUT_MS){
-        digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
+        blinkState = !blinkState;
+        setLed(blinkState);
         vTaskDelay(200 / portTICK_PERIOD_MS);
     };
 
-    digitalWrite(LED_BUILTIN, LOW);
-
     if(WiFi.status() != WL_CONNECTED){
-        Serial.println("[WiFi] FAILED");
-        vTaskDelay(20000 / portTICK_PERIOD_MS);
+        Serial.println("[WiFi] failed, retrying...");
+        WiFi.disconnect(true);
+        unsigned long retryStart = millis();
+        while (millis() - retryStart < WIFI_RETRY_DELAY_MS) {
+          blinkState = !blinkState;
+          setLed(blinkState);
+          vTaskDelay(250 / portTICK_PERIOD_MS);
+        }
         continue;
     }
 
-    digitalWrite(LED_BUILTIN, HIGH);
-    Serial.print("[WiFi] CONNECTED");
+    setLed(true);
+    Serial.print("[WiFi] connected, IP: ");
     Serial.println(WiFi.localIP());
 
   }
@@ -43,6 +61,21 @@ void KeepWiFiAlive(void* paramaters){
 
 
 void setup() { 
+  Serial.begin(115200);
+  pinMode(LED_BUILTIN, OUTPUT);
+  setLed(false);
+  delay(300);
+  Serial.println("[BOOT] starting...");
+
+  xTaskCreatePinnedToCore(
+        KeepWiFiAlive,
+        "Keep WiFi alive",
+        5000,
+        NULL,
+        1,
+        NULL,
+        CONFIG_ARDUINO_RUNNING_CORE
+  );
 }
 
 void loop() {
