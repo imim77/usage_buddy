@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <WiFi.h>
+#include "display.h"
 #include "env_config.h"
 
 #ifndef WIFI_TIMEOUT_MS
@@ -18,7 +19,7 @@ static void setLed(bool on) {
   digitalWrite(LED_BUILTIN, (LED_ACTIVE_LOW ? !on : on) ? HIGH : LOW);
 }
 
-void KeepWiFiAlive(void* paramaters){
+void KeepWiFiAlive(void *parameters) {
   for(;;){
     if(WiFi.status() == WL_CONNECTED){
         setLed(true);
@@ -66,6 +67,7 @@ void setup() {
   setLed(false);
   delay(300);
   Serial.println("[BOOT] starting...");
+  startDisplayTask();
 
   xTaskCreatePinnedToCore(
         KeepWiFiAlive,
@@ -76,6 +78,7 @@ void setup() {
         NULL,
         CONFIG_ARDUINO_RUNNING_CORE
   );
+
 }
 
 void loop() {
