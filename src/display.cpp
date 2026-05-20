@@ -18,6 +18,7 @@
 
 QueueHandle_t displayQueue;
 QueueHandle_t httpQueue;
+SemaphoreHandle_t sliderMutex;
 
 static Adafruit_SSD1306 oled(OLED_WIDTH, OLED_HEIGHT, &Wire, -1);
 static RoboEyes<Adafruit_SSD1306> eyes(oled);
@@ -41,67 +42,38 @@ static void init_eyes() {
 }
 
 static void handle_button_press() {
-  slider.next_screen();
+  if (xSemaphoreTake(sliderMutex, pdMS_TO_TICKS(100))) {
+    slider.next_screen();
+    xSemaphoreGive(sliderMutex);
+  }
   bool trigger = true;
-  xQueueSend(httpQueue, &trigger, 0);
-}
-
-static void httpTask(void *parameters) {
-  httpQueue = xQueueCreate(10, sizeof(bool));
-  bool dummy;
-
-  for (;;) {
-    if (xQueueReceive(httpQueue, &dummy, portMAX_DELAY) == pdTRUE) {
-      if (WiFi.status() == WL_CONNECTED) {
-        HTTPClient http;
-        http.setTimeout(REQUEST_TIMEOUT_MS);
-        http.begin(SERVER_HOST, SERVER_PORT, SERVER_PATH);
-        int code = http.GET();
-        
-        if (code == 200) {
-          String payload = http.getString();
-          JsonDocument doc;
-          DeserializationError error = deserializeJson(doc, payload);
-          if (!error) {
-            const char *weekly = doc["usage"]["weekly"]["formatted"];
-            const char *pace = doc["pace"]["weekly"];
-            if (weekly && pace) {
-              slider.set_usage_data(weekly, pace);
-            }
-          }
-        }
-        http.end();
-      }
-    }
+  if (httpQueue != nullptr) {
+    xQueueSend(httpQueue, &trigger, 0);
   }
 }
 
 void set_usage_data(const char *weekly, const char *pace) {
-  slider.set_usage_data(weekly, pace);
+  if (xSemaphoreTake(sliderMutex, pdMS_TO_TICKS(100))) {
+    slider.set_usage_data(weekly, pace);
+    xSemaphoreGive(sliderMutex);
+  }
 }
 
 static void displayTask(void *parameters) {
   init_hardware();
   init_eyes();
 
-  displayQueue = xQueueCreate(10, sizeof(bool));
   bool button_pressed = false;
-
-  xTaskCreatePinnedToCore(
-      httpTask,
-      "HTTP task",
-      5000,
-      nullptr,
-      1,
-      nullptr,
-      CONFIG_ARDUINO_RUNNING_CORE);
 
   for (;;) {
     if (xQueueReceive(displayQueue, &button_pressed, 0) == pdTRUE && button_pressed) {
       handle_button_press();
     }
 
-    slider.render();
+    if (xSemaphoreTake(sliderMutex, pdMS_TO_TICKS(100))) {
+      slider.render();
+      xSemaphoreGive(sliderMutex);
+    }
     vTaskDelay(DISPLAY_TICK_MS / portTICK_PERIOD_MS);
   }
 }
@@ -111,6 +83,15 @@ void startDisplayTask() {
       displayTask,
       "Display task",
       6144,
+      nullptr,
+      1,
+      nullptr,
+      CONFIG_ARDUINO_RUNNING_CORE);
+      
+  xTaskCreatePinnedToCore(
+      httpTask,
+      "HTTP task",
+      5000,
       nullptr,
       1,
       nullptr,

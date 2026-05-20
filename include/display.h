@@ -3,6 +3,7 @@
 #include <Adafruit_SSD1306.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
+#include <freertos/semphr.h>
 
 struct Coords {
   uint8_t x;
@@ -36,4 +37,7 @@ public:
 };
 
 extern QueueHandle_t displayQueue;
+extern QueueHandle_t httpQueue;
+extern SemaphoreHandle_t sliderMutex;
 void startDisplayTask();
+void httpTask(void *parameters);
