@@ -1,7 +1,9 @@
 #include <Arduino.h>
 #include <WiFi.h>
+#include <HTTPClient.h>
 #include "display.h"
 #include "env_config.h"
+#include "http_client.h"
 
 #ifndef WIFI_TIMEOUT_MS
 #define WIFI_TIMEOUT_MS 20000
@@ -21,6 +23,20 @@
 
 static void setLed(bool on) {
   digitalWrite(LED_BUILTIN, (LED_ACTIVE_LOW ? !on : on) ? HIGH : LOW);
+}
+
+static RequestClient client({SERVER_HOST, SERVER_PORT, REQUEST_TIMEOUT_MS});
+
+void HttpTask(void *parameters) {
+  for (;;) {
+    if (WiFi.status() == WL_CONNECTED) {
+      int code;
+      String payload = client.get(SERVER_PATH, code);
+      Serial.printf("[HTTP] GET %s -> %d\n", SERVER_PATH, code);
+      Serial.printf("[HTTP] Response: %s\n", payload.c_str());
+    }
+    vTaskDelay(REQUEST_INTERVAL_MS / portTICK_PERIOD_MS);
+  }
 }
 
 void KeepWiFiAlive(void *parameters) {
@@ -66,7 +82,7 @@ void KeepWiFiAlive(void *parameters) {
 
 
 void setup() { 
-  Serial.begin(921600);
+  Serial.begin(115200);
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   setLed(false);
@@ -77,6 +93,16 @@ void setup() {
   xTaskCreatePinnedToCore(
         KeepWiFiAlive,
         "Keep WiFi alive",
+        5000,
+        NULL,
+        1,
+        NULL,
+        CONFIG_ARDUINO_RUNNING_CORE
+  );
+
+  xTaskCreatePinnedToCore(
+        HttpTask,
+        "HTTP Task",
         5000,
         NULL,
         1,

@@ -1,9 +1,15 @@
 #pragma once
 #include <stdint.h>
 #include <HTTPClient.h>
+#include "env_config.h"
+
+#define SERVER_PORT 3000
+#define SERVER_PATH "/codex/usage"
+#define REQUEST_TIMEOUT_MS 5000
+#define REQUEST_INTERVAL_MS 30000
 
 struct HttpClientConfig {
-  const char *server_url;
+  const char *host;
   uint16_t port;
   uint32_t timeout_ms;
 };
@@ -15,12 +21,13 @@ public:
   RequestClient(const HttpClientConfig &config)
     : config(config) {}
 
-  int get(const char *path) {
+  String get(const char *path, int &code) {
     HTTPClient http;
     http.setTimeout(config.timeout_ms);
-    http.begin(config.server_url, config.port, path);
-    int code = http.GET();
+    http.begin(config.host, config.port, path);
+    code = http.GET();
+    String payload = http.getString();
     http.end();
-    return code;
+    return payload;
   }
 };
