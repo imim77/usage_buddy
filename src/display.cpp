@@ -87,13 +87,4 @@ void startDisplayTask() {
       1,
       nullptr,
       CONFIG_ARDUINO_RUNNING_CORE);
-      
-  xTaskCreatePinnedToCore(
-      httpTask,
-      "HTTP task",
-      5000,
-      nullptr,
-      1,
-      nullptr,
-      CONFIG_ARDUINO_RUNNING_CORE);
 }

@@ -40,4 +40,3 @@ extern QueueHandle_t displayQueue;
 extern QueueHandle_t httpQueue;
 extern SemaphoreHandle_t sliderMutex;
 void startDisplayTask();
-void httpTask(void *parameters);

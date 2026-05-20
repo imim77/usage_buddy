@@ -23,10 +23,39 @@
 #define BUTTON_PIN 5
 #endif
 
-#define BUTTON_DEBOUNCE_MS 50
+#define BUTTON_DEBOUNCE_MS 200
 
 static void setLed(bool on) {
   digitalWrite(LED_BUILTIN, (LED_ACTIVE_LOW ? !on : on) ? HIGH : LOW);
+}
+
+static SemaphoreHandle_t buttonSemaphore;
+static volatile uint32_t lastButtonPress = 0;
+
+void IRAM_ATTR buttonISR() {
+  uint32_t now = millis();
+  if (now - lastButtonPress >= BUTTON_DEBOUNCE_MS) {
+    lastButtonPress = now;
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    xSemaphoreGiveFromISR(buttonSemaphore, &xHigherPriorityTaskWoken);
+    if (xHigherPriorityTaskWoken) {
+      portYIELD_FROM_ISR();
+    }
+  }
+}
+
+void ButtonTask(void *parameters) {
+  pinMode(BUTTON_PIN, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), buttonISR, FALLING);
+  
+  for (;;) {
+    if (xSemaphoreTake(buttonSemaphore, portMAX_DELAY) == pdPASS) {
+      if (displayQueue != nullptr) {
+        bool buttonPressed = true;
+        xQueueSend(displayQueue, &buttonPressed, 0);
+      }
+    }
+  }
 }
 
 enum WiFiState {
@@ -125,34 +154,6 @@ void HttpTask(void *parameters) {
   }
 }
 
-void ButtonTask(void *parameters) {
-  static bool lastButtonState = HIGH;
-  static unsigned long lastStateChange = 0;
-  
-  pinMode(BUTTON_PIN, INPUT_PULLUP);
-  
-  for (;;) {
-    bool buttonState = digitalRead(BUTTON_PIN);
-    unsigned long now = millis();
-    
-    if (buttonState != lastButtonState) {
-      lastStateChange = now;
-    }
-    
-    if (now - lastStateChange >= BUTTON_DEBOUNCE_MS) {
-      if (lastButtonState == HIGH && buttonState == LOW) {
-        if (displayQueue != nullptr) {
-          bool buttonPressed = true;
-          xQueueSend(displayQueue, &buttonPressed, 0);
-        }
-      }
-    }
-    
-    lastButtonState = buttonState;
-    vTaskDelay(10 / portTICK_PERIOD_MS);
-  }
-}
-
 void setup() { 
   Serial.begin(115200);
   pinMode(LED_BUILTIN, OUTPUT);
@@ -161,6 +162,7 @@ void setup() {
   displayQueue = xQueueCreate(10, sizeof(bool));
   httpQueue = xQueueCreate(10, sizeof(bool));
   sliderMutex = xSemaphoreCreateMutex();
+  buttonSemaphore = xSemaphoreCreateBinary();
   
   vTaskDelay(300 / portTICK_PERIOD_MS);
   Serial.println("[BOOT] starting...");
