@@ -1,9 +1,11 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <ArduinoJson.h>
 #include "display.h"
 #include "env_config.h"
 #include "http_client.h"
+#include "usage_display.h"
 
 #ifndef WIFI_TIMEOUT_MS
 #define WIFI_TIMEOUT_MS 20000
@@ -34,6 +36,20 @@ void HttpTask(void *parameters) {
       String payload = client.get(SERVER_PATH, code);
       Serial.printf("[HTTP] GET %s -> %d\n", SERVER_PATH, code);
       Serial.printf("[HTTP] Response: %s\n", payload.c_str());
+
+      if (code == 200) {
+        JsonDocument doc;
+        DeserializationError error = deserializeJson(doc, payload);
+        if (!error) {
+          const char *weekly = doc["usage"]["weekly"]["formatted"];
+          const char *pace = doc["pace"]["weekly"];
+          if (weekly && pace) {
+            set_usage_data(weekly, pace);
+          }
+        } else {
+          Serial.printf("[JSON] Parse failed: %s\n", error.c_str());
+        }
+      }
     }
     vTaskDelay(REQUEST_INTERVAL_MS / portTICK_PERIOD_MS);
   }
