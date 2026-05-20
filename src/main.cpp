@@ -54,103 +54,106 @@ void ButtonTask(void *parameters) {
         bool buttonPressed = true;
         xQueueSend(displayQueue, &buttonPressed, 0);
       }
+      if (httpQueue != nullptr) {
+        bool triggerFetch = true;
+        xQueueSend(httpQueue, &triggerFetch, 0);
+      }
     }
   }
 }
 
-enum WiFiState {
-  WIFI_DISCONNECTED,
-  WIFI_CONNECTING,
-  WIFI_CONNECTED,
-  WIFI_RETRY_DELAY
-};
+static void fetchAndParseUsage() {
+  if (WiFi.status() != WL_CONNECTED) return;
+  
+  RequestClient client({SERVER_HOST, SERVER_PORT, REQUEST_TIMEOUT_MS});
+  int code;
+  String payload = client.get(SERVER_PATH, code);
+  Serial.printf("[HTTP] GET %s -> %d\n", SERVER_PATH, code);
 
-static WiFiState wifiState = WIFI_DISCONNECTED;
-static unsigned long stateStartTime = 0;
-static bool ledBlinkState = false;
-
-void KeepWiFiAlive(void *parameters) {
-  for (;;) {
-    unsigned long now = millis();
-    
-    switch (wifiState) {
-      case WIFI_DISCONNECTED:
-        Serial.println("[WiFi] connecting...");
-        WiFi.mode(WIFI_STA);
-        WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-        wifiState = WIFI_CONNECTING;
-        stateStartTime = now;
-        ledBlinkState = false;
-        break;
-        
-      case WIFI_CONNECTING:
-        ledBlinkState = !ledBlinkState;
-        setLed(ledBlinkState);
-        
-        if (WiFi.status() == WL_CONNECTED) {
-          setLed(true);
-          Serial.print("[WiFi] connected, IP: ");
-          Serial.println(WiFi.localIP());
-          wifiState = WIFI_CONNECTED;
-          stateStartTime = now;
-        } else if (now - stateStartTime >= WIFI_TIMEOUT_MS) {
-          Serial.println("[WiFi] connection timeout, retrying...");
-          WiFi.disconnect(true);
-          wifiState = WIFI_RETRY_DELAY;
-          stateStartTime = now;
-          ledBlinkState = false;
-        }
-        vTaskDelay(200 / portTICK_PERIOD_MS);
-        break;
-        
-      case WIFI_CONNECTED:
-        setLed(true);
-        if (WiFi.status() != WL_CONNECTED) {
-          Serial.println("[WiFi] disconnected");
-          wifiState = WIFI_DISCONNECTED;
-        } else {
-          vTaskDelay(10000 / portTICK_PERIOD_MS);
-        }
-        break;
-        
-      case WIFI_RETRY_DELAY:
-        ledBlinkState = !ledBlinkState;
-        setLed(ledBlinkState);
-        
-        if (now - stateStartTime >= WIFI_RETRY_DELAY_MS) {
-          wifiState = WIFI_DISCONNECTED;
-        }
-        vTaskDelay(250 / portTICK_PERIOD_MS);
-        break;
+  if (code == 200) {
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, payload);
+    if (!error) {
+      const char *weekly = doc["usage"]["weekly"]["formatted"];
+      const char *pace = doc["pace"]["weekly"];
+      if (weekly && pace) {
+        set_usage_data(weekly, pace);
+      }
+    } else {
+      Serial.printf("[JSON] Parse failed: %s\n", error.c_str());
     }
   }
 }
 
 void HttpTask(void *parameters) {
-  RequestClient client({SERVER_HOST, SERVER_PORT, REQUEST_TIMEOUT_MS});
+  bool dummy;
   
   for (;;) {
-    if (WiFi.status() == WL_CONNECTED) {
-      int code;
-      String payload = client.get(SERVER_PATH, code);
-      Serial.printf("[HTTP] GET %s -> %d\n", SERVER_PATH, code);
-      Serial.printf("[HTTP] Response: %s\n", payload.c_str());
-
-      if (code == 200) {
-        JsonDocument doc;
-        DeserializationError error = deserializeJson(doc, payload);
-        if (!error) {
-          const char *weekly = doc["usage"]["weekly"]["formatted"];
-          const char *pace = doc["pace"]["weekly"];
-          if (weekly && pace) {
-            set_usage_data(weekly, pace);
-          }
-        } else {
-          Serial.printf("[JSON] Parse failed: %s\n", error.c_str());
-        }
-      }
+    if (xQueueReceive(httpQueue, &dummy, portMAX_DELAY) == pdPASS) {
+      fetchAndParseUsage();
     }
-    vTaskDelay(REQUEST_INTERVAL_MS / portTICK_PERIOD_MS);
+  }
+}
+
+void KeepWiFiAlive(void *parameters) {
+  enum State { DISCONNECTED, CONNECTING, CONNECTED, RETRY_DELAY };
+  State state = DISCONNECTED;
+  unsigned long stateStart = 0;
+  bool blink = false;
+  
+  for (;;) {
+    unsigned long now = millis();
+    
+    switch (state) {
+      case DISCONNECTED:
+        Serial.println("[WiFi] connecting...");
+        WiFi.mode(WIFI_STA);
+        WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+        state = CONNECTING;
+        stateStart = now;
+        blink = false;
+        break;
+        
+      case CONNECTING:
+        blink = !blink;
+        setLed(blink);
+        
+        if (WiFi.status() == WL_CONNECTED) {
+          setLed(true);
+          Serial.print("[WiFi] connected, IP: ");
+          Serial.println(WiFi.localIP());
+          state = CONNECTED;
+          stateStart = now;
+        } else if (now - stateStart >= WIFI_TIMEOUT_MS) {
+          Serial.println("[WiFi] timeout, retrying...");
+          WiFi.disconnect(true);
+          state = RETRY_DELAY;
+          stateStart = now;
+          blink = false;
+        }
+        vTaskDelay(200 / portTICK_PERIOD_MS);
+        break;
+        
+      case CONNECTED:
+        setLed(true);
+        if (WiFi.status() != WL_CONNECTED) {
+          Serial.println("[WiFi] disconnected");
+          state = DISCONNECTED;
+        } else {
+          vTaskDelay(10000 / portTICK_PERIOD_MS);
+        }
+        break;
+        
+      case RETRY_DELAY:
+        blink = !blink;
+        setLed(blink);
+        
+        if (now - stateStart >= WIFI_RETRY_DELAY_MS) {
+          state = DISCONNECTED;
+        }
+        vTaskDelay(250 / portTICK_PERIOD_MS);
+        break;
+    }
   }
 }
 

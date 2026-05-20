@@ -1,12 +1,9 @@
 #include <Arduino.h>
 #include <Adafruit_SSD1306.h>
 #include <Wire.h>
-#include <HTTPClient.h>
-#include <ArduinoJson.h>
 #include "display.h"
 #include "screen_slider.h"
 #include "usage_display.h"
-#include "http_client.h"
 
 #define OLED_SDA 21
 #define OLED_SCL 22
@@ -14,7 +11,6 @@
 #define OLED_WIDTH 128
 #define OLED_HEIGHT 64
 #define ROBOEYES_FPS 30
-#define DISPLAY_TICK_MS 1
 
 QueueHandle_t displayQueue;
 QueueHandle_t httpQueue;
@@ -46,10 +42,6 @@ static void handle_button_press() {
     slider.next_screen();
     xSemaphoreGive(sliderMutex);
   }
-  bool trigger = true;
-  if (httpQueue != nullptr) {
-    xQueueSend(httpQueue, &trigger, 0);
-  }
 }
 
 void set_usage_data(const char *weekly, const char *pace) {
@@ -64,6 +56,7 @@ static void displayTask(void *parameters) {
   init_eyes();
 
   bool button_pressed = false;
+  TickType_t frameDelay = pdMS_TO_TICKS(1000 / ROBOEYES_FPS);
 
   for (;;) {
     if (xQueueReceive(displayQueue, &button_pressed, 0) == pdTRUE && button_pressed) {
@@ -74,7 +67,7 @@ static void displayTask(void *parameters) {
       slider.render();
       xSemaphoreGive(sliderMutex);
     }
-    vTaskDelay(DISPLAY_TICK_MS / portTICK_PERIOD_MS);
+    vTaskDelay(frameDelay);
   }
 }
 
