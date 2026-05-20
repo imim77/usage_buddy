@@ -28,7 +28,7 @@ void KeepWiFiAlive(void *parameters) {
     if(WiFi.status() == WL_CONNECTED){
         setLed(true);
         Serial.println("[WiFi] still connected");
-        vTaskDelay(10000 / portTICK_PERIOD_MS);
+        vTaskDelay(20000 / portTICK_PERIOD_MS);
         continue;
     }
 
@@ -66,7 +66,7 @@ void KeepWiFiAlive(void *parameters) {
 
 
 void setup() { 
-  Serial.begin(115200);
+  Serial.begin(921600);
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   setLed(false);
