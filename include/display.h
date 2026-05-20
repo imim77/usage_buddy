@@ -1,6 +1,8 @@
 #pragma once
 #include <stdint.h>
 #include <Adafruit_SSD1306.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
 
 struct Coords {
   uint8_t x;
@@ -32,3 +34,6 @@ public:
   }
 
 };
+
+extern QueueHandle_t displayQueue;
+void startDisplayTask();

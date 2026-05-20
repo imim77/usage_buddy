@@ -16,11 +16,7 @@
 #endif
 
 #ifndef BUTTON_PIN
-#ifdef D5
-#define BUTTON_PIN D5
-#else
-#define BUTTON_PIN 18
-#endif
+#define BUTTON_PIN 5
 #endif
 
 static void setLed(bool on) {

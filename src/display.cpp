@@ -61,7 +61,7 @@ static void displayTask(void *parameters) {
   for (;;) {
     if (xQueueReceive(displayQueue, &buttonPressed, 0) == pdTRUE) {
       if (buttonPressed) {
-        display.display_text("Button pressed!", {10, 20}, 2, true);
+        display.display_text("Button pressed", {10, 20}, 2, true);
         buttonMessageTime = millis();
       }
     }
