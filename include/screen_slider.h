@@ -25,7 +25,7 @@ private:
 
   void draw_progress_bar(uint8_t percent) {
     const uint8_t bar_x = 5;
-    const uint8_t bar_y = 50;
+    const uint8_t bar_y = 35;
     const uint8_t bar_w = 118;
     const uint8_t bar_h = 10;
 
@@ -71,13 +71,16 @@ public:
       case SCREEN_BUTTON_PRESSED:
         oled->clearDisplay();
         oled->setTextColor(SSD1306_WHITE);
-        oled->setCursor(5, 10);
-        oled->setTextSize(1);
+        oled->setCursor(5, 5);
+        oled->setTextSize(1); 
         oled->print("Weekly usage\n");
+        oled->setCursor(5, 22);
         oled->print(weekly_text);
-        oled->setCursor(5, 30);
-        oled->print(pace_text);
         draw_progress_bar(usage_percent);
+        oled->setCursor(5, 55);
+        oled->setTextColor(SSD1306_WHITE); 
+        oled->print("Pace: ");
+        oled->print(pace_text);
         oled->display();
         break;
     }
