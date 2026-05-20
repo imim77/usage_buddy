@@ -44,9 +44,9 @@ static void handle_button_press() {
   }
 }
 
-void set_usage_data(const char *weekly, const char *pace) {
+void set_usage_data(const char *weekly, const char *pace, uint8_t percent) {
   if (xSemaphoreTake(sliderMutex, pdMS_TO_TICKS(100))) {
-    slider.set_usage_data(weekly, pace);
+    slider.set_usage_data(weekly, pace, percent);
     xSemaphoreGive(sliderMutex);
   }
 }

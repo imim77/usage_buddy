@@ -76,8 +76,9 @@ static void fetchAndParseUsage() {
     if (!error) {
       const char *weekly = doc["usage"]["weekly"]["formatted"];
       const char *pace = doc["pace"]["weekly"];
+      uint8_t percent = doc["usage"]["weekly"]["displayPercent"] | 0;
       if (weekly && pace) {
-        set_usage_data(weekly, pace);
+        set_usage_data(weekly, pace, percent);
       }
     } else {
       Serial.printf("[JSON] Parse failed: %s\n", error.c_str());
