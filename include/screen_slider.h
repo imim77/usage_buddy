@@ -66,7 +66,14 @@ public:
   void render() {
     switch (current_screen) {
       case SCREEN_EYES:
-        eyes->update();
+        if (usage_percent <= 20) {
+            eyes->setMood(ANGRY);
+        } else if (usage_percent < 60) {
+            eyes->setMood(DEFAULT);
+        } else {
+            eyes->setMood(HAPPY);
+        }
+        eyes->update(); 
         break;
       case SCREEN_BUTTON_PRESSED:
         oled->clearDisplay();
