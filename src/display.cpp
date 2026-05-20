@@ -6,76 +6,57 @@
 #include <FluxGarage_RoboEyes.h>
 #include <Wire.h>
 #include "display.h"
+#include "screen_slider.h"
 
-#ifndef OLED_SDA
 #define OLED_SDA 21
-#endif
-
-#ifndef OLED_SCL
 #define OLED_SCL 22
-#endif
-
-#ifndef OLED_ADDR
 #define OLED_ADDR 0x3C
-#endif
-
-#ifndef OLED_WIDTH
 #define OLED_WIDTH 128
-#endif
-
-#ifndef OLED_HEIGHT
 #define OLED_HEIGHT 64
-#endif
-
-#ifndef ROBOEYES_FPS
 #define ROBOEYES_FPS 30
-#endif
+#define DISPLAY_TICK_MS 1
 
 QueueHandle_t displayQueue;
 
 static Adafruit_SSD1306 oled(OLED_WIDTH, OLED_HEIGHT, &Wire, -1);
-static SSD1306OLED display(&oled);
 static RoboEyes<Adafruit_SSD1306> eyes(oled);
+static ScreenSlider slider(&oled, &eyes);
 
-static void displayTask(void *parameters) {
+static void init_hardware() {
   Wire.begin(OLED_SDA, OLED_SCL);
-
   if (!oled.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR)) {
     Serial.println("[OLED] init failed");
     vTaskDelete(nullptr);
-    return;
   }
+}
 
+static void init_eyes() {
   eyes.begin(OLED_WIDTH, OLED_HEIGHT, ROBOEYES_FPS);
   eyes.setAutoblinker(ON, 4, 0);
   eyes.setWidth(40, 40);
   eyes.setHeight(40, 40);
   eyes.setBorderradius(8, 14);
   eyes.setMood(ANGRY);
+}
+
+static void handle_button_press() {
+  slider.next_screen();
+}
+
+static void displayTask(void *parameters) {
+  init_hardware();
+  init_eyes();
 
   displayQueue = xQueueCreate(10, sizeof(bool));
-
-  bool buttonPressed = false;
-  unsigned long buttonMessageTime = 0;
+  bool button_pressed = false;
 
   for (;;) {
-    if (xQueueReceive(displayQueue, &buttonPressed, 0) == pdTRUE) {
-      if (buttonPressed) {
-        display.display_text("Button pressed", {10, 20}, 2, true);
-        buttonMessageTime = millis();
-      }
+    if (xQueueReceive(displayQueue, &button_pressed, 0) == pdTRUE && button_pressed) {
+      handle_button_press();
     }
 
-    if (buttonPressed && millis() - buttonMessageTime > 2000) {
-      buttonPressed = false;
-      oled.clearDisplay();
-      oled.display();
-    }
-
-    if (!buttonPressed) {
-      eyes.update();
-    }
-    vTaskDelay(1 / portTICK_PERIOD_MS);
+    slider.render();
+    vTaskDelay(DISPLAY_TICK_MS / portTICK_PERIOD_MS);
   }
 }
 
