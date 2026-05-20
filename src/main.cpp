@@ -15,6 +15,14 @@
 #define LED_ACTIVE_LOW 0
 #endif
 
+#ifndef BUTTON_PIN
+#ifdef D5
+#define BUTTON_PIN D5
+#else
+#define BUTTON_PIN 18
+#endif
+#endif
+
 static void setLed(bool on) {
   digitalWrite(LED_BUILTIN, (LED_ACTIVE_LOW ? !on : on) ? HIGH : LOW);
 }
@@ -64,6 +72,7 @@ void KeepWiFiAlive(void *parameters) {
 void setup() { 
   Serial.begin(115200);
   pinMode(LED_BUILTIN, OUTPUT);
+  pinMode(BUTTON_PIN, INPUT_PULLUP);
   setLed(false);
   delay(300);
   Serial.println("[BOOT] starting...");
@@ -82,5 +91,14 @@ void setup() {
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
+  static bool lastButtonState = HIGH;
+  bool buttonState = digitalRead(BUTTON_PIN);
+
+  if (lastButtonState == HIGH && buttonState == LOW && displayQueue != nullptr) {
+    bool buttonPressed = true;
+    xQueueSend(displayQueue, &buttonPressed, 0);
+  }
+
+  lastButtonState = buttonState;
+  delay(10);
 }
