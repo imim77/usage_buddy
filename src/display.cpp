@@ -79,5 +79,5 @@ void startDisplayTask() {
       nullptr,
       1,
       nullptr,
-      CONFIG_ARDUINO_RUNNING_CORE);
+      1);  
 }

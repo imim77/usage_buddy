@@ -180,7 +180,7 @@ void setup() {
         NULL,
         2,
         NULL,
-        CONFIG_ARDUINO_RUNNING_CORE
+        0  
   );
 
   xTaskCreatePinnedToCore(
@@ -190,7 +190,7 @@ void setup() {
         NULL,
         1,
         NULL,
-        CONFIG_ARDUINO_RUNNING_CORE
+        1  
   );
   
   xTaskCreatePinnedToCore(
@@ -200,7 +200,7 @@ void setup() {
         NULL,
         3,
         NULL,
-        CONFIG_ARDUINO_RUNNING_CORE
+        1  
   );
 }
 
