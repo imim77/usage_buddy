@@ -4,7 +4,7 @@
 
 ### A tiny ESP32 companion for monitoring your Codex usage in real time
 
-Displays your remaining Codex usage through different expressions and moods of your little OLED "buddy", changing dynamically based on how much usage you have left.
+Displays your remaining Codex usage through different expressions and moods of your little OLED "buddy", changing dynamically based on how much usage you have left. The project is developed using the Arduino framework and leverages FreeRTOS for multitasking, task scheduling, and asynchronous execution.
 </div>
 
 ---
@@ -18,14 +18,6 @@ This project uses:
 - Button
 - Breadboard
 - Jumper Wires
-
----
-
-## 📸 Preview
-
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/6b26424e-0065-4caa-ae10-90606dece2bf" width="700"/>
-</p>
 
 ---
 
